@@ -124,9 +124,15 @@
 
       const handleSubmit = async () => {
         setSending(true);
-        // TODO: decommentare quando hai il webhook n8n
-        // await fetch("https://tuo-n8n.app.n8n.cloud/webhook/feedback", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ answers, notes, extraNotes }) });
-        await new Promise(r => setTimeout(r, 600));
+        try {
+          await fetch("https://valezz.app.n8n.cloud/webhook-test/form-submission", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ answers, notes, extraNotes })
+          });
+        } catch (err) {
+          console.error("Errore invio:", err);
+        }
         setSending(false);
         setSubmitted(true);
       };
