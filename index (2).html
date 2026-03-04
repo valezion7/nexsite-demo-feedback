@@ -1,0 +1,318 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Feedback Demo — NexSite AI</title>
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.3.1/umd/react.production.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.3.1/umd/react-dom.production.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.26.2/babel.min.js"></script>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { background: #fafbfc; font-family: 'Outfit', sans-serif; }
+    textarea:focus, button:focus { outline: none; }
+    textarea:focus { border-color: #a5b4fc !important; }
+    textarea::placeholder { color: #94a3b8; }
+    button:hover { filter: brightness(1.05); }
+    @keyframes fadeScale { 0% { opacity:0; transform:scale(0.97); } 100% { opacity:1; transform:scale(1); } }
+    @keyframes fadeUp { 0% { opacity:0; transform:translateY(10px); } 100% { opacity:1; transform:translateY(0); } }
+    @keyframes slideIn { 0% { opacity:0; transform:translateX(30px); } 100% { opacity:1; transform:translateX(0); } }
+    @keyframes slideInReverse { 0% { opacity:0; transform:translateX(-30px); } 100% { opacity:1; transform:translateX(0); } }
+  </style>
+</head>
+<body>
+  <div id="root"></div>
+  <script type="text/babel">
+    const { useState, useEffect, useRef } = React;
+
+    const QUESTIONS = [
+      { id: "layout", label: "Struttura del sito", desc: "Ti piace come è organizzato il sito? Le sezioni e la disposizione ti sembrano chiare?", type: "choice" },
+      { id: "colors", label: "Colori", desc: "I colori usati ti piacciono e rappresentano bene la tua attività?", type: "choice" },
+      { id: "font", label: "Stile dei testi", desc: "Il carattere usato per i testi ti sembra leggibile e adatto al tuo brand?", type: "choice" },
+      { id: "photos", label: "Foto e immagini", desc: "Per le immagini del sito, quale opzione preferisci?", type: "photos" },
+      { id: "texts", label: "Testi e contenuti", desc: "I testi che vedi nel sito sono stati generati da noi come bozza. Hai un tono di voce specifico che vorresti usare? Oppure hai dei testi o documenti tuoi da cui possiamo prendere spunto?", type: "notes_only" },
+      { id: "navigation", label: "Navigazione", desc: "È facile muoversi nel sito e trovare quello che cerchi?", type: "choice" },
+      { id: "mobile", label: "Da smartphone", desc: "Hai provato ad aprire il sito dal telefono? Si vede bene?", type: "choice" },
+      { id: "domain", label: "Dominio", desc: "Hai già un dominio (es. www.tuosito.it) oppure dobbiamo occuparcene noi?", type: "domain" },
+      { id: "overall", label: "Impressione generale", desc: "Nel complesso, il sito rispecchia quello che avevi in mente?", type: "choice" },
+    ];
+
+    const PHOTO_OPTIONS = [
+      { value: "mine", label: "Uso le mie foto", sub: "Ho già foto di qualità pronte da inviarti" },
+      { value: "mix", label: "Un mix", sub: "Alcune mie + alcune generate/stock" },
+      { value: "generate", label: "Fate tutto voi", sub: "Non ho foto, usate contenuti generati" },
+    ];
+
+    const DOMAIN_OPTIONS = [
+      { value: "have", label: "Sì, ho già un dominio", sub: "Dovrò comunicarvi i dati di accesso" },
+      { value: "need", label: "No, serve un dominio", sub: "Vorrei che ve ne occupaste voi" },
+      { value: "unsure", label: "Non sono sicuro", sub: "Ho bisogno di una mano per capire" },
+    ];
+
+    const S = {
+      page: { minHeight: "100vh", background: "#fafbfc", display: "flex", alignItems: "center", justifyContent: "center", padding: "32px 16px", fontFamily: "'Outfit', sans-serif" },
+      card: { width: "100%", padding: "32px 28px", borderRadius: 20, background: "#fff", border: "1px solid #e8ecf0", boxShadow: "0 4px 24px rgba(0,0,0,0.04), 0 1px 3px rgba(0,0,0,0.02)" },
+      textarea: { width: "100%", background: "#f8fafc", border: "1px solid #e2e8f0", borderRadius: 12, padding: "12px 16px", color: "#1e293b", fontSize: 14, fontFamily: "'Outfit', sans-serif", resize: "vertical", lineHeight: 1.7, minHeight: 80 },
+      primaryBtn: { display: "inline-flex", alignItems: "center", justifyContent: "center", padding: "14px 28px", borderRadius: 12, border: "none", background: "linear-gradient(135deg, #6366f1, #7c3aed)", color: "#fff", fontSize: 14, fontWeight: 600, fontFamily: "'Outfit', sans-serif", cursor: "pointer", transition: "all 0.25s ease", boxShadow: "0 2px 16px rgba(99,102,241,0.2)" },
+      backBtn: { width: 48, height: 48, borderRadius: 12, border: "1px solid #e2e8f0", background: "#fff", color: "#64748b", fontSize: 16, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", fontFamily: "'Outfit', sans-serif", transition: "all 0.25s ease" },
+      iconCircle: { width: 56, height: 56, borderRadius: 16, margin: "0 auto 20px", background: "linear-gradient(135deg, #22c55e, #4ade80)", display: "flex", alignItems: "center", justifyContent: "center", color: "#fff", fontSize: 24, fontWeight: 700, boxShadow: "0 8px 24px rgba(34,197,94,0.2)" },
+    };
+
+    function ProgressBar({ progress, label, done }) {
+      return (
+        <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 20 }}>
+          <div style={{ flex: 1, height: 3, background: "#f1f5f9", borderRadius: 2, overflow: "hidden" }}>
+            <div style={{ height: "100%", borderRadius: 2, background: done ? "linear-gradient(90deg, #22c55e, #4ade80)" : "linear-gradient(90deg, #6366f1, #8b5cf6)", width: progress + "%", transition: "width 0.5s cubic-bezier(0.4,0,0.2,1)" }} />
+          </div>
+          <span style={{ fontSize: 12, fontWeight: 600, color: done ? "#22c55e" : "#94a3b8", flexShrink: 0 }}>{label}</span>
+        </div>
+      );
+    }
+
+    function App() {
+      const [step, setStep] = useState(-1);
+      const [answers, setAnswers] = useState({});
+      const [notes, setNotes] = useState({});
+      const [extraNotes, setExtraNotes] = useState("");
+      const [dir, setDir] = useState(1);
+      const [animKey, setAnimKey] = useState(0);
+      const [submitted, setSubmitted] = useState(false);
+      const [sending, setSending] = useState(false);
+      const [ready, setReady] = useState(false);
+      const textRef = useRef(null);
+
+      useEffect(() => { setTimeout(() => setReady(true), 80); }, []);
+
+      const goTo = (n) => { setDir(n > step ? 1 : -1); setAnimKey(k => k + 1); setStep(n); };
+
+      const total = QUESTIONS.length;
+      const q = QUESTIONS[step];
+      const answer = q ? answers[q.id] : null;
+      const isExtra = step === total;
+      const progress = step < 0 ? 0 : step >= total ? 100 : Math.round(((step + 1) / total) * 100);
+
+      const canAdvance = () => {
+        if (!q) return false;
+        if (q.type === "notes_only") return true;
+        if (q.type === "photos" || q.type === "domain") return !!answer;
+        if (q.type === "choice") {
+          if (!answer) return false;
+          if ((answer === "si_ma" || answer === "no") && (!notes[q.id] || !notes[q.id].trim())) return false;
+          return true;
+        }
+        return true;
+      };
+
+      const handleChoice = (val) => {
+        setAnswers(p => ({ ...p, [q.id]: val }));
+        if (val === "si") {
+          setNotes(p => { const n = { ...p }; delete n[q.id]; return n; });
+          setTimeout(() => goTo(step + 1), 350);
+        } else {
+          setTimeout(() => textRef.current?.focus(), 250);
+        }
+      };
+
+      const handleOption = (val) => {
+        setAnswers(p => ({ ...p, [q.id]: val }));
+        setTimeout(() => goTo(step + 1), 350);
+      };
+
+      const next = () => { if (canAdvance()) goTo(step < total - 1 ? step + 1 : total); };
+      const back = () => { if (step > 0) goTo(step - 1); };
+
+      const handleSubmit = async () => {
+        setSending(true);
+        try {
+          await fetch("https://valezz.app.n8n.cloud/webhook/form-submission", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ answers, notes, extraNotes })
+          });
+        } catch (err) {
+          console.error("Errore invio:", err);
+        }
+        setSending(false);
+        setSubmitted(true);
+      };
+
+      // SUBMITTED
+      if (submitted) {
+        return (
+          <div style={S.page}>
+            <div style={{ ...S.card, maxWidth: 540, animation: "fadeScale 0.5s ease" }}>
+              <div style={{ textAlign: "center", marginBottom: 32 }}>
+                <div style={S.iconCircle}>✓</div>
+                <h1 style={{ fontSize: 26, fontWeight: 700, color: "#0f172a", marginBottom: 8 }}>Feedback ricevuto!</h1>
+                <p style={{ color: "#64748b", fontSize: 15, lineHeight: 1.7 }}>Grazie mille, ci mettiamo subito al lavoro.</p>
+              </div>
+              <div style={{ display: "flex", flexDirection: "column", gap: 8, marginBottom: 24 }}>
+                {QUESTIONS.map((qu) => {
+                  const a = answers[qu.id]; const n = notes[qu.id];
+                  if (!a && !n) return null;
+                  let status, statusColor;
+                  if (qu.type === "choice") { status = a === "si" ? "Approvato" : a === "si_ma" ? "Da modificare" : "Da rivedere"; statusColor = a === "si" ? "#22c55e" : a === "si_ma" ? "#d97706" : "#ef4444"; }
+                  else if (qu.type === "photos") { status = PHOTO_OPTIONS.find(o => o.value === a)?.label; statusColor = "#6366f1"; }
+                  else if (qu.type === "domain") { status = DOMAIN_OPTIONS.find(o => o.value === a)?.label; statusColor = "#6366f1"; }
+                  else { status = n ? "Note lasciate" : "Nessuna nota"; statusColor = n ? "#6366f1" : "#94a3b8"; }
+                  return (
+                    <div key={qu.id} style={{ padding: "14px 18px", borderRadius: 14, background: "#f8fafc", border: "1px solid #f1f5f9" }}>
+                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                        <span style={{ fontSize: 14, fontWeight: 600, color: "#1e293b" }}>{qu.label}</span>
+                        <span style={{ fontSize: 12, fontWeight: 600, color: statusColor }}>{status}</span>
+                      </div>
+                      {n && <p style={{ fontSize: 13, color: "#64748b", marginTop: 8, lineHeight: 1.6 }}>"{n}"</p>}
+                    </div>
+                  );
+                })}
+              </div>
+              {extraNotes.trim() && (
+                <div style={{ padding: "14px 18px", borderRadius: 14, background: "#f8fafc", border: "1px solid #f1f5f9", marginBottom: 24 }}>
+                  <span style={{ fontSize: 14, fontWeight: 600, color: "#1e293b" }}>Note aggiuntive</span>
+                  <p style={{ fontSize: 13, color: "#64748b", marginTop: 8, lineHeight: 1.6 }}>"{extraNotes}"</p>
+                </div>
+              )}
+              <div style={{ textAlign: "center", paddingTop: 16, borderTop: "1px solid #f1f5f9" }}>
+                <span style={{ fontSize: 11, color: "#cbd5e1", fontWeight: 500 }}>NexSite AI — Full Remote Agency</span>
+              </div>
+            </div>
+          </div>
+        );
+      }
+
+      // INTRO
+      if (step === -1) {
+        return (
+          <div style={S.page}>
+            <div style={{ ...S.card, maxWidth: 500, textAlign: "center", opacity: ready ? 1 : 0, transform: ready ? "translateY(0)" : "translateY(30px)", transition: "all 0.8s cubic-bezier(0.16,1,0.3,1)" }}>
+              <div style={{ width: 52, height: 52, borderRadius: 14, margin: "0 auto 24px", background: "linear-gradient(135deg, #6366f1, #8b5cf6)", display: "flex", alignItems: "center", justifyContent: "center", boxShadow: "0 8px 32px rgba(99,102,241,0.2)" }}>
+                <span style={{ color: "#fff", fontSize: 20, fontWeight: 700 }}>N</span>
+              </div>
+              <h1 style={{ fontSize: 28, fontWeight: 700, color: "#0f172a", letterSpacing: "-0.03em", lineHeight: 1.3, marginBottom: 12 }}>Il tuo sito è quasi pronto ✨</h1>
+              <p style={{ fontSize: 16, color: "#64748b", lineHeight: 1.8, maxWidth: 380, margin: "0 auto 12px" }}>Grazie per aver scelto NexSite AI.</p>
+              <p style={{ fontSize: 15, color: "#94a3b8", lineHeight: 1.7, maxWidth: 380, margin: "0 auto 36px" }}>Rispondi a poche domande veloci per aiutarci a rendere il sito perfetto per te.</p>
+              <div style={{ display: "flex", gap: 10, justifyContent: "center", marginBottom: 36, flexWrap: "wrap" }}>
+                {[{ icon: "◎", label: "9 domande" }, { icon: "◷", label: "2 min" }].map((item, i) => (
+                  <div key={i} style={{ padding: "8px 16px", borderRadius: 100, background: "#f8fafc", border: "1px solid #e2e8f0", display: "flex", alignItems: "center", gap: 6, opacity: ready ? 1 : 0, transform: ready ? "translateY(0)" : "translateY(10px)", transition: "all 0.5s ease " + (0.3 + i * 0.1) + "s" }}>
+                    <span style={{ color: "#6366f1", fontSize: 13 }}>{item.icon}</span>
+                    <span style={{ color: "#64748b", fontSize: 13, fontWeight: 500 }}>{item.label}</span>
+                  </div>
+                ))}
+              </div>
+              <button onClick={() => goTo(0)} style={S.primaryBtn}>Iniziamo <span style={{ marginLeft: 6, fontSize: 16 }}>→</span></button>
+              <div style={{ marginTop: 32, paddingTop: 16, borderTop: "1px solid #f1f5f9" }}>
+                <span style={{ fontSize: 11, color: "#cbd5e1", fontWeight: 500 }}>Powered by NexSite AI</span>
+              </div>
+            </div>
+          </div>
+        );
+      }
+
+      // EXTRA NOTES
+      if (isExtra) {
+        return (
+          <div style={S.page}>
+            <div style={{ ...S.card, maxWidth: 540, animation: "slide" + (dir > 0 ? "In" : "InReverse") + " 0.4s ease" }} key={"extra-" + animKey}>
+              <ProgressBar progress={100} label="Ci siamo!" done={true} />
+              <div style={{ textAlign: "center", marginBottom: 28 }}>
+                <h2 style={{ fontSize: 22, fontWeight: 700, color: "#0f172a", marginBottom: 6 }}>Vuoi aggiungere qualcosa?</h2>
+                <p style={{ color: "#64748b", fontSize: 14, lineHeight: 1.7 }}>Qualsiasi idea, dubbio o richiesta — scrivila qui sotto.</p>
+              </div>
+              <textarea value={extraNotes} onChange={(e) => setExtraNotes(e.target.value)} placeholder="Scrivi liberamente... (opzionale)" style={{ ...S.textarea, minHeight: 120 }} />
+              <div style={{ display: "flex", gap: 10, marginTop: 24 }}>
+                <button onClick={() => goTo(total - 1)} style={S.backBtn}>←</button>
+                <button onClick={handleSubmit} disabled={sending} style={{ ...S.primaryBtn, flex: 1, opacity: sending ? 0.6 : 1 }}>
+                  {sending ? "Invio in corso..." : "Invia feedback ✦"}
+                </button>
+              </div>
+            </div>
+          </div>
+        );
+      }
+
+      // QUESTION
+      return (
+        <div style={S.page}>
+          <div style={{ ...S.card, maxWidth: 540, animation: "slide" + (dir > 0 ? "In" : "InReverse") + " 0.4s ease" }} key={"q-" + animKey}>
+            <ProgressBar progress={progress} label={(step + 1) + " di " + total} />
+            <div style={{ display: "flex", gap: 4, justifyContent: "center", marginBottom: 28 }}>
+              {QUESTIONS.map((_, i) => (<div key={i} style={{ width: i === step ? 20 : 5, height: 5, borderRadius: 3, background: i < step ? "#6366f1" : i === step ? "#8b5cf6" : "#e2e8f0", transition: "all 0.35s ease" }} />))}
+            </div>
+            <div style={{ textAlign: "center", marginBottom: 28 }}>
+              <span style={{ display: "inline-block", padding: "5px 14px", borderRadius: 100, background: "#f0f0ff", color: "#6366f1", fontSize: 12, fontWeight: 600, marginBottom: 16, letterSpacing: "0.02em" }}>{q.label}</span>
+              <h2 style={{ fontSize: 20, fontWeight: 600, color: "#1e293b", lineHeight: 1.5 }}>{q.desc}</h2>
+            </div>
+
+            {q.type === "choice" && (<React.Fragment>
+              <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                {[
+                  { value: "si", label: "Sì, mi piace", color: "#22c55e", bg: "#f0fdf4", border: "#bbf7d0" },
+                  { value: "si_ma", label: "Sì, ma cambierei qualcosa", color: "#d97706", bg: "#fffbeb", border: "#fde68a" },
+                  { value: "no", label: "No, non mi convince", color: "#ef4444", bg: "#fef2f2", border: "#fecaca" },
+                ].map(opt => { const sel = answer === opt.value; return (
+                  <button key={opt.value} onClick={() => handleChoice(opt.value)} style={{ display: "flex", alignItems: "center", gap: 12, width: "100%", padding: "14px 18px", borderRadius: 12, border: "1.5px solid " + (sel ? opt.border : "#e2e8f0"), background: sel ? opt.bg : "#fff", cursor: "pointer", transition: "all 0.25s ease", fontFamily: "'Outfit', sans-serif" }}>
+                    <div style={{ width: 20, height: 20, borderRadius: 6, flexShrink: 0, border: "2px solid " + (sel ? opt.color : "#d1d5db"), background: sel ? opt.color : "transparent", display: "flex", alignItems: "center", justifyContent: "center", transition: "all 0.25s ease" }}>{sel && <span style={{ color: "#fff", fontSize: 11, fontWeight: 700 }}>✓</span>}</div>
+                    <span style={{ fontSize: 14, fontWeight: 500, color: sel ? opt.color : "#475569" }}>{opt.label}</span>
+                  </button>
+                ); })}
+              </div>
+              {(answer === "si_ma" || answer === "no") && (
+                <div style={{ marginTop: 16, animation: "fadeUp 0.3s ease" }}>
+                  <label style={{ fontSize: 13, fontWeight: 600, color: answer === "no" ? "#ef4444" : "#d97706", marginBottom: 8, display: "block" }}>{answer === "no" ? "Raccontaci cosa non ti convince:" : "Cosa cambieresti?"}</label>
+                  <textarea ref={textRef} value={notes[q.id] || ""} onChange={(e) => setNotes(p => ({ ...p, [q.id]: e.target.value }))} placeholder="Scrivi qui..." style={S.textarea} rows={3} />
+                </div>
+              )}
+            </React.Fragment>)}
+
+            {q.type === "photos" && (
+              <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                {PHOTO_OPTIONS.map(opt => { const sel = answer === opt.value; return (
+                  <button key={opt.value} onClick={() => handleOption(opt.value)} style={{ display: "flex", flexDirection: "column", gap: 2, textAlign: "left", width: "100%", padding: "16px 18px", borderRadius: 12, border: "1.5px solid " + (sel ? "#818cf8" : "#e2e8f0"), background: sel ? "#f0f0ff" : "#fff", cursor: "pointer", transition: "all 0.25s ease", fontFamily: "'Outfit', sans-serif" }}>
+                    <span style={{ fontSize: 14, fontWeight: 600, color: sel ? "#6366f1" : "#1e293b" }}>{opt.label}</span>
+                    <span style={{ fontSize: 12, color: sel ? "#818cf8" : "#94a3b8" }}>{opt.sub}</span>
+                  </button>
+                ); })}
+              </div>
+            )}
+
+            {q.type === "domain" && (
+              <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                {DOMAIN_OPTIONS.map(opt => { const sel = answer === opt.value; return (
+                  <button key={opt.value} onClick={() => handleOption(opt.value)} style={{ display: "flex", flexDirection: "column", gap: 2, textAlign: "left", width: "100%", padding: "16px 18px", borderRadius: 12, border: "1.5px solid " + (sel ? "#818cf8" : "#e2e8f0"), background: sel ? "#f0f0ff" : "#fff", cursor: "pointer", transition: "all 0.25s ease", fontFamily: "'Outfit', sans-serif" }}>
+                    <span style={{ fontSize: 14, fontWeight: 600, color: sel ? "#6366f1" : "#1e293b" }}>{opt.label}</span>
+                    <span style={{ fontSize: 12, color: sel ? "#818cf8" : "#94a3b8" }}>{opt.sub}</span>
+                  </button>
+                ); })}
+              </div>
+            )}
+
+            {q.type === "notes_only" && (
+              <div>
+                <textarea ref={textRef} value={notes[q.id] || ""} onChange={(e) => setNotes(p => ({ ...p, [q.id]: e.target.value }))} placeholder="Es: tono formale, amichevole, giovane... oppure 'vi mando dei file da cui prendere spunto'" style={{ ...S.textarea, minHeight: 100 }} rows={4} />
+                <p style={{ fontSize: 12, color: "#94a3b8", marginTop: 8 }}>Puoi anche inviarci materiale dopo, in qualsiasi momento.</p>
+              </div>
+            )}
+
+            <div style={{ display: "flex", gap: 10, marginTop: 24 }}>
+              {step > 0 && <button onClick={back} style={S.backBtn}>←</button>}
+              {((q.type !== "choice" || answer === "si_ma" || answer === "no") && q.type !== "notes_only") ? (
+                <button onClick={next} disabled={!canAdvance()} style={{ ...S.primaryBtn, flex: 1, opacity: canAdvance() ? 1 : 0.4, cursor: canAdvance() ? "pointer" : "not-allowed" }}>
+                  {step < total - 1 ? "Avanti" : "Quasi finito"} <span style={{ marginLeft: 6, fontSize: 16 }}>→</span>
+                </button>
+              ) : null}
+              {q.type === "notes_only" && (
+                <button onClick={next} style={{ ...S.primaryBtn, flex: 1 }}>
+                  {step < total - 1 ? "Avanti" : "Quasi finito"} <span style={{ marginLeft: 6, fontSize: 16 }}>→</span>
+                </button>
+              )}
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    ReactDOM.createRoot(document.getElementById("root")).render(<App />);
+  </script>
+</body>
+</html>
